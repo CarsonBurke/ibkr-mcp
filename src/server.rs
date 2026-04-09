@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use ibapi::accounts::types::AccountGroup;
 use ibapi::accounts::{AccountSummaryResult, AccountSummaryTags, PositionUpdate};
@@ -14,9 +15,12 @@ use serde::Deserialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
+type ContractIdCache = Arc<Mutex<HashMap<String, i32>>>;
+
 #[derive(Debug, Clone)]
 pub struct IbkrServer {
     client: Arc<Client>,
+    contract_id_cache: ContractIdCache,
     tool_router: ToolRouter<Self>,
 }
 
@@ -24,8 +28,20 @@ impl IbkrServer {
     pub fn new(client: Arc<Client>) -> Self {
         Self {
             client,
+            contract_id_cache: Arc::new(Mutex::new(HashMap::new())),
             tool_router: Self::tool_router(),
         }
+    }
+
+    fn resolve_contract_id(&self, symbol: &str) -> Result<i32, String> {
+        if let Some(&id) = self.contract_id_cache.lock().unwrap().get(symbol) {
+            return Ok(id);
+        }
+        let contract = Contract::stock(symbol).build();
+        let details = self.client.contract_details(&contract).map_err(|e| format!("Error resolving symbol: {e}"))?;
+        let id = details.first().map(|d| d.contract.contract_id).ok_or_else(|| format!("Unknown symbol: {symbol}"))?;
+        self.contract_id_cache.lock().unwrap().insert(symbol.to_uppercase(), id);
+        Ok(id)
     }
 }
 
@@ -119,21 +135,26 @@ impl IbkrServer {
 
     #[tool(description = "Get news headlines for a ticker symbol")]
     async fn news_headlines(&self, Parameters(req): Parameters<HeadlinesRequest>) -> String {
-        let client = self.client.clone();
+        let server = self.clone();
         tokio::task::spawn_blocking(move || {
-            let contract = Contract::stock(&req.symbol).build();
-            let details = match client.contract_details(&contract) {
-                Ok(d) => d,
-                Err(e) => return format!("Error resolving symbol: {e}"),
+            let contract_id = match server.resolve_contract_id(&req.symbol) {
+                Ok(id) => id,
+                Err(e) => return e,
             };
-            let contract_id = match details.first() {
-                Some(d) => d.contract.contract_id,
-                None => return format!("Unknown symbol: {}", req.symbol),
-            };
+            let client = &server.client;
 
+            let all_providers: Vec<String>;
             let provider_codes: Vec<&str> = match &req.providers {
                 Some(p) if !p.is_empty() => p.split(',').collect(),
-                _ => vec![],
+                _ => {
+                    // Empty provider list causes TWS to hang; fetch all available
+                    all_providers = client.news_providers()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|p| p.code.clone())
+                        .collect();
+                    all_providers.iter().map(|s| s.as_str()).collect()
+                }
             };
 
             let end = OffsetDateTime::now_utc();
@@ -151,7 +172,7 @@ impl IbkrServer {
                 Ok(sub) => {
                     let mut lines =
                         vec!["Time | Provider | Headline | Article ID".into(), "--- | --- | --- | ---".into()];
-                    for article in sub.iter() {
+                    for article in sub.timeout_iter(std::time::Duration::from_secs(5)) {
                         lines.push(format!(
                             "{} | {} | {} | {}",
                             article.time.format(&Rfc3339).unwrap_or_default(),
