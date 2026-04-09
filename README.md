@@ -1,6 +1,6 @@
 # ibkr-mcp
 
-Read-only MCP server for Interactive Brokers via [rust-ibapi](https://github.com/wboayue/rust-ibapi). Exposes tools for news, historical bars, contract lookup, and account data over HTTP. No trading, no mutations.
+Local based, read-only MCP server for Interactive Brokers via [rust-ibapi](https://github.com/wboayue/rust-ibapi). Exposes tools for news, historical bars, contract lookup, and account data over HTTP.
 
 Requires TWS or IB Gateway running locally.
 
@@ -10,7 +10,7 @@ Requires TWS or IB Gateway running locally.
 cargo install --path .
 ```
 
-This puts `ibkr-mcp` in `~/.cargo/bin/`. Works on Linux, macOS, and Windows.
+This puts `ibkr-mcp` in `~/.cargo/bin/` or equivalent for Linux, macOS, and Windows.
 
 ## Run
 
