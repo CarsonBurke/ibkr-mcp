@@ -1,13 +1,23 @@
 # ibkr-mcp
 
-MCP server for Interactive Brokers via [rust-ibapi](https://github.com/wboayue/rust-ibapi). Exposes read-only tools for news, historical bars, contract lookup, and account data over stdio. No trading, no mutations.
+Read-only MCP server for Interactive Brokers via [rust-ibapi](https://github.com/wboayue/rust-ibapi). Exposes tools for news, historical bars, contract lookup, and account data over HTTP. No trading, no mutations.
 
 Requires TWS or IB Gateway running locally.
 
-## Build
+## Install
 
 ```sh
-cargo build --release
+cargo install --path .
+```
+
+This puts `ibkr-mcp` in `~/.cargo/bin/`. Works on Linux, macOS, and Windows.
+
+## Run
+
+```sh
+ibkr-mcp                    # listen on http://127.0.0.1:3099/mcp
+ibkr-mcp --port 4000        # custom port
+ibkr-mcp --ibkr-addr 127.0.0.1:7497  # connect to TWS instead of Gateway
 ```
 
 ## Tools
@@ -26,13 +36,7 @@ cargo build --release
 ## Adding to Claude Code
 
 ```sh
-claude mcp add -s user ibkr -- target/release/ibkr-mcp
-```
-
-Or for project scope only:
-
-```sh
-claude mcp add ibkr -- target/release/ibkr-mcp
+claude mcp add -s user --transport http ibkr http://127.0.0.1:3099/mcp
 ```
 
 Tools appear as `mcp__ibkr__news_headlines`, `mcp__ibkr__historical_bars`, etc.
@@ -42,9 +46,9 @@ Manage with `claude mcp list`, `claude mcp remove ibkr`.
 ## Adding to Codex CLI
 
 ```sh
-codex mcp add ibkr -- /path/to/ibkr-mcp/target/release/ibkr-mcp
+codex mcp add --transport http ibkr http://127.0.0.1:3099/mcp
 ```
 
 ## Connection
 
-Default: `127.0.0.1:4002` (IB Gateway paper trading), client ID 99. To change, edit `src/main.rs` — the address is hardcoded to avoid runtime config complexity. TWS uses port 7497 (paper) or 7496 (live).
+Default: `127.0.0.1:4002` (IB Gateway paper trading). TWS uses port 7497 (paper) or 7496 (live). Override with `--ibkr-addr`.
