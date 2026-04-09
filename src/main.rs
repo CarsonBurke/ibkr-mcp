@@ -39,11 +39,9 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let client = Client::connect(&cli.ibkr_addr, cli.client_id)
-        .map_err(|e| anyhow::anyhow!("Failed to connect to TWS/Gateway at {}: {e}", cli.ibkr_addr))?;
-    let shared_client = Arc::new(client);
+    let shared_client = Arc::new(connect_with_fallback(&cli.ibkr_addr, cli.client_id)?);
 
-    tracing::info!("Connected to IBKR at {} (client ID {})", cli.ibkr_addr, cli.client_id);
+    tracing::info!("Connected to IBKR at {} (client ID {})", cli.ibkr_addr, shared_client.client_id());
 
     let config = StreamableHttpServerConfig::default();
     let cancel = config.cancellation_token.clone();
@@ -56,7 +54,14 @@ async fn main() -> Result<()> {
 
     let app = axum::Router::new().nest_service("/mcp", service);
     let addr = format!("127.0.0.1:{}", cli.port);
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            tracing::info!("ibkr-mcp already running on {addr}");
+            return Ok(());
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     tracing::info!("ibkr-mcp listening on http://{addr}/mcp");
 
@@ -69,4 +74,16 @@ async fn main() -> Result<()> {
         .await?;
 
     Ok(())
+}
+
+fn connect_with_fallback(addr: &str, preferred_id: i32) -> Result<Client> {
+    for id in [preferred_id, preferred_id + 1, preferred_id + 2] {
+        match Client::connect(addr, id) {
+            Ok(c) => return Ok(c),
+            Err(e) => {
+                tracing::warn!("Client ID {id} failed: {e}, trying next...");
+            }
+        }
+    }
+    anyhow::bail!("Failed to connect to TWS/Gateway at {addr} (tried client IDs {preferred_id}-{})", preferred_id + 2)
 }
