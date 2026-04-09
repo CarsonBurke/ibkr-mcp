@@ -7,6 +7,7 @@ use ibapi::contracts::Contract;
 use ibapi::market_data::historical::{BarSize, Duration, WhatToShow};
 use ibapi::market_data::TradingHours;
 use rmcp::handler::server::{router::tool::ToolRouter, wrapper::Parameters};
+use rmcp::model::{ServerCapabilities, ServerInfo};
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -20,18 +21,28 @@ pub struct IbkrServer {
 }
 
 impl IbkrServer {
-    pub fn new(addr: &str, client_id: i32) -> anyhow::Result<Self> {
-        let client = Client::connect(addr, client_id)
-            .map_err(|e| anyhow::anyhow!("Failed to connect to TWS/Gateway at {addr}: {e}"))?;
-        Ok(Self {
-            client: Arc::new(client),
+    pub fn new(client: Arc<Client>) -> Self {
+        Self {
+            client,
             tool_router: Self::tool_router(),
-        })
+        }
     }
 }
 
 #[tool_handler]
-impl ServerHandler for IbkrServer {}
+impl ServerHandler for IbkrServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(concat!(
+                "Read-only Interactive Brokers market data. ",
+                "Tools: news (providers, headlines, articles), contracts (details, search), ",
+                "historical OHLCV bars, account summary, and positions.\n\n",
+                "If this server is not reachable, start it with:\n",
+                "  ibkr-mcp\n\n",
+                "Requires TWS or IB Gateway on 127.0.0.1:4002.",
+            ))
+    }
+}
 
 // --- Request types ---
 
