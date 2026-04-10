@@ -11,7 +11,7 @@ use rmcp::transport::StreamableHttpService;
 use tracing_subscriber::{self, EnvFilter};
 
 const DEFAULT_PORT: u16 = 3099;
-const DEFAULT_IBKR_ADDR: &str = "127.0.0.1:4002";
+const IBKR_PORTS: &[u16] = &[4002, 4001, 7497, 7496];
 
 #[derive(Parser)]
 #[command(name = "ibkr-mcp", about = "Read-only IBKR MCP server")]
@@ -20,9 +20,9 @@ struct Cli {
     #[arg(short, long, default_value_t = DEFAULT_PORT)]
     port: u16,
 
-    /// TWS/Gateway address
-    #[arg(long, default_value = DEFAULT_IBKR_ADDR)]
-    ibkr_addr: String,
+    /// TWS/Gateway address (if omitted, tries ports 4002, 4001, 7497, 7496)
+    #[arg(long)]
+    ibkr_addr: Option<String>,
 
     /// IBKR client ID
     #[arg(long, default_value_t = 99)]
@@ -39,9 +39,12 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let shared_client = Arc::new(connect_with_fallback(&cli.ibkr_addr, cli.client_id)?);
+    let shared_client = Arc::new(match &cli.ibkr_addr {
+        Some(addr) => connect_with_fallback(addr, cli.client_id)?,
+        None => connect_auto_discover(cli.client_id)?,
+    });
 
-    tracing::info!("Connected to IBKR at {} (client ID {})", cli.ibkr_addr, shared_client.client_id());
+    tracing::info!("Connected to IBKR (client ID {})", shared_client.client_id());
 
     let config = StreamableHttpServerConfig::default();
     let cancel = config.cancellation_token.clone();
@@ -76,12 +79,29 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn connect_auto_discover(preferred_id: i32) -> Result<Client> {
+    for port in IBKR_PORTS {
+        let addr = format!("127.0.0.1:{port}");
+        match connect_with_fallback(&addr, preferred_id) {
+            Ok(c) => {
+                tracing::info!("Found TWS/Gateway on port {port}");
+                return Ok(c);
+            }
+            Err(_) => continue,
+        }
+    }
+    anyhow::bail!(
+        "No TWS/Gateway found on ports {:?} (tried client IDs {preferred_id}-{})",
+        IBKR_PORTS, preferred_id + 2
+    )
+}
+
 fn connect_with_fallback(addr: &str, preferred_id: i32) -> Result<Client> {
     for id in [preferred_id, preferred_id + 1, preferred_id + 2] {
         match Client::connect(addr, id) {
             Ok(c) => return Ok(c),
             Err(e) => {
-                tracing::warn!("Client ID {id} failed: {e}, trying next...");
+                tracing::warn!("Client ID {id} failed on {addr}: {e}, trying next...");
             }
         }
     }
