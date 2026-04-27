@@ -11,7 +11,7 @@ use rmcp::transport::StreamableHttpService;
 use tracing_subscriber::{self, EnvFilter};
 
 const DEFAULT_PORT: u16 = 3099;
-const IBKR_PORTS: &[u16] = &[4002, 4001, 7497, 7496];
+const IBKR_PORTS: &[u16] = &[4001, 4002, 7497, 7496];
 
 #[derive(Parser)]
 #[command(name = "ibkr-mcp", about = "Read-only IBKR MCP server")]

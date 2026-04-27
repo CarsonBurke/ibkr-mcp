@@ -55,4 +55,4 @@ See [example-skills/analyze-stock/SKILL.md](example-skills/analyze-stock/SKILL.m
 
 ## Connection
 
-Default: `127.0.0.1:4002` (IB Gateway paper trading). TWS uses port 7497 (paper) or 7496 (live). Override with `--ibkr-addr`.
+Default: `127.0.0.1:4001` (IB Gateway paper trading). TWS uses port 7497 (paper) or 7496 (live). Override with `--ibkr-addr`.
