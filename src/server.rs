@@ -55,7 +55,7 @@ impl ServerHandler for IbkrServer {
                 "historical OHLCV bars, account summary, and positions.\n\n",
                 "If this server is not reachable, start it with:\n",
                 "  ibkr-mcp\n\n",
-                "Requires TWS or IB Gateway on 127.0.0.1:4002.",
+                "Requires TWS or IB Gateway listening on 127.0.0.1 (auto-discovers ports 4001, 4002, 7497, 7496).",
             ))
     }
 }

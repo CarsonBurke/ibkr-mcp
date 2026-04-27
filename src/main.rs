@@ -20,7 +20,7 @@ struct Cli {
     #[arg(short, long, default_value_t = DEFAULT_PORT)]
     port: u16,
 
-    /// TWS/Gateway address (if omitted, tries ports 4002, 4001, 7497, 7496)
+    /// TWS/Gateway address (if omitted, tries ports 4001, 4002, 7497, 7496)
     #[arg(long)]
     ibkr_addr: Option<String>,
 
