@@ -49,6 +49,10 @@ Manage with `claude mcp list`, `claude mcp remove ibkr`.
 codex mcp add --transport http ibkr http://127.0.0.1:3099/mcp
 ```
 
+## Usage and Skills
+
+See [example-skills/analyze-stock/SKILL.md](example-skills/analyze-stock/SKILL.md) instructing an agent on how to use `ibkr-mcp` for market analysis.
+
 ## Connection
 
 Default: `127.0.0.1:4002` (IB Gateway paper trading). TWS uses port 7497 (paper) or 7496 (live). Override with `--ibkr-addr`.
